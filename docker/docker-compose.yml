@@ -1,0 +1,33 @@
+version: "3.3"
+
+services:
+  sandbox-rust186:
+    build:
+      context: ..
+      args:
+        - SANDBOX_USER_UID=999
+        - SANDBOX_DIR=/sandbox
+      dockerfile: ./docker/Dockerfile
+    container_name: sandbox-rust186
+    image: sandbox-rust186
+    volumes:
+      - ../src:/app/src
+      - import:/sandbox/import:ro
+    ports:
+      - "9009:9009"
+    networks:
+      - localhost
+    environment:
+      - SANDBOX_USER_UID=999
+      - SANDBOX_DIR=/sandbox
+      - RUST_BACKTRACE=1
+    restart: on-failure
+    command: gunicorn --pythonpath '/app/src' --bind 0:9009 app.main:app --reload -w 1
+
+networks:
+  localhost:
+    external: true
+
+volumes:
+  import:
+    external: true

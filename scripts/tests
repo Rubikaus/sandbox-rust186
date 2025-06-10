@@ -1,0 +1,2 @@
+#!/bin/bash
+docker exec -it sandbox-rust186 pytest -vv -p no:cacheprovider /app/src
