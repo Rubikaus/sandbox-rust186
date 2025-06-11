@@ -11,139 +11,162 @@ from app.utils import clean_str, clean_error
 
 
 class RustService:
-    @classmethod
-    def _preexec_fn(cls):
-        def change_process_user():
-            # Drop privileges inside the sandbox
+    @staticmethod
+    def _drop_privileges():
+        def _fn():
             os.setgid(config.SANDBOX_USER_UID)
             os.setuid(config.SANDBOX_USER_UID)
-        return change_process_user
+        return _fn
 
     @classmethod
     def _compile(cls, file: RustFile) -> Optional[str]:
         proc = subprocess.Popen(
-            ['cargo', 'build', '--release', '--quiet'],
+            ["cargo", "build", "--release", "--quiet"],
             cwd=file.project_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
         )
         try:
-            _, error = proc.communicate(timeout=config.TIMEOUT)
+            _, err = proc.communicate(timeout=config.TIMEOUT)
         except subprocess.TimeoutExpired:
-            error = messages.MSG_RUST_COMPILE_TIMEOUT
-        except Exception as ex:
+            err = messages.MSG_RUST_COMPILE_TIMEOUT
+        except Exception as ex:  # pragma: no cover
             raise exceptions.CompileException(details=str(ex))
         finally:
             proc.kill()
 
-        if proc.returncode == 0:
+        rc = getattr(proc, "returncode", 0)
+        if rc == 0 and not err:
             return None
-        return clean_error(error)
+        return err
+
 
     @classmethod
-    def _execute(
-        cls,
-        file: RustFile,
-        data_in: Optional[str] = None
-    ) -> ExecuteResult:
+    def _execute(cls, file: RustFile, data_in: Optional[str] = None) -> ExecuteResult:
         env = os.environ.copy()
         env["RUST_BACKTRACE"] = "0"
+
+        if isinstance(data_in, str) and "\n" in data_in:
+            data_in = data_in.replace("\n", " ")
 
         proc = subprocess.Popen(
             [file.filepath_out],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            preexec_fn=cls._preexec_fn,
+            preexec_fn=cls._drop_privileges(),
             env=env,
-            text=True
+            text=True,
         )
         try:
-            result, error = proc.communicate(
-                input=data_in,
-                timeout=config.TIMEOUT
-            )
+            out, err = proc.communicate(input=data_in, timeout=config.TIMEOUT)
         except subprocess.TimeoutExpired:
-            result, error = None, messages.MSG_1
+            return ExecuteResult(result=None, error=messages.MSG_1)
         except Exception as ex:
             raise exceptions.ExecutionException(details=str(ex))
         finally:
             proc.kill()
 
-        error_clean = cls._strip_backtrace(error)
-        combined = (result or '') + (error_clean or '')
+        err_clean = cls._strip_backtrace(err)
+        err_final = clean_error(err_clean or None)
 
-        return ExecuteResult(
-            result=clean_str(combined or None),
-            error=clean_error(error_clean or None)
-        )
+        out_final: Optional[str]
+        if err_clean and "panicked at" in err_clean:
+            merged = (out or "") + (err_clean or "")
+            out_final = clean_str(merged or None)
+            err_final = messages.MSG_RUST_PANIC
+        else:
+            out_final = clean_str(out or None)
+
+        return ExecuteResult(result=out_final, error=err_final)
+
 
     @staticmethod
     def _strip_backtrace(error: Optional[str]) -> Optional[str]:
         if not error:
             return error
 
-        cleaned_lines = []
-        skip = False
-        for ln in error.splitlines():
-            if ln.startswith('stack backtrace:'):
+        cleaned, skip = [], False
+        for line in error.splitlines():
+            if line.startswith("stack backtrace:"):
                 skip = True
                 continue
 
             if skip:
-                if re.match(r'\s*\d+:\s', ln) or ln.strip() == '':
+                if re.match(r"\s*\d+:\s", line) or not line.strip():
                     continue
                 skip = False
 
-            if ln.startswith('note:') and 'RUST_BACKTRACE' in ln:
+            if line.startswith("note:") and "RUST_BACKTRACE" in line:
                 continue
 
-            cleaned_lines.append(ln)
+            cleaned.append(line)
 
-        return '\n'.join(cleaned_lines)
-
-    @classmethod
-    def _validate_checker_func(cls, checker_func: str):
-        ...
-
-    @classmethod
-    def _check(cls, checker_func: str, **checker_func_vars) -> bool:
-        ...
+        return "\n".join(cleaned)
 
     @classmethod
     def debug(cls, data: DebugData) -> DebugData:
-        file = RustFile(data.code)
+        rust = RustFile(data.code)
 
-        error = cls._compile(file)
-        if error:
-            data.error = error
+        if (err := cls._compile(rust)):
+            data.error = err
         else:
-            exec_result = cls._execute(file=file, data_in=data.data_in)
-            data.result = exec_result.result
-            data.error = exec_result.error
+            exec_res = cls._execute(file=rust, data_in=data.data_in)
+            data.result, data.error = exec_res.result, exec_res.error
 
-        file.remove()
+        rust.remove()
         return data
 
     @classmethod
     def testing(cls, data: TestsData) -> TestsData:
-        file = RustFile(data.code)
-        error = cls._compile(file)
+        rust = RustFile(data.code)
+        compile_err = cls._compile(rust)
 
         for test in data.tests:
-            if error:
-                test.error = error
-                test.ok = False
-            else:
-                exec_result = cls._execute(file=file, data_in=test.data_in)
-                test.result = exec_result.result
-                test.error = exec_result.error
-                test.ok = cls._check(
-                    checker_func=data.checker,
-                    right_value=test.data_out,
-                    value=test.result
-                )
+            if compile_err:
+                test.error, test.ok = compile_err, False
+                continue
 
-        file.remove()
+            exec_res = cls._execute(file=rust, data_in=test.data_in)
+            test.result, test.error = exec_res.result, exec_res.error
+            test.ok = cls._check(
+                checker_func=data.checker,
+                right_value=test.data_out,
+                value=test.result,
+            )
+
+        rust.remove()
         return data
+
+    @classmethod
+    def _validate_checker_func(cls, checker_func: str):
+        try:
+            local_ns: dict = {}
+            exec(checker_func, {}, local_ns)
+        except SyntaxError as ex:
+            raise exceptions.CheckerException(
+                message=messages.MSG_5,
+                details=str(ex)
+            )
+
+        fn = local_ns.get("checker")
+        if not callable(fn):
+            raise exceptions.CheckerException(message=messages.MSG_2)
+        if "return" not in checker_func.split("def checker", 1)[1]:
+            raise exceptions.CheckerException(message=messages.MSG_3)
+        return fn
+
+    @classmethod
+    def _check(cls, checker_func: str, **checker_func_vars) -> bool:
+        fn = cls._validate_checker_func(checker_func)
+        try:
+            result = fn(**checker_func_vars)
+        except Exception as ex:
+            raise exceptions.CheckerException(
+                message=messages.MSG_4,
+                details=str(ex)
+            )
+        if not isinstance(result, bool):
+            raise exceptions.CheckerException(message=messages.MSG_4)
+        return result

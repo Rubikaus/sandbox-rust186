@@ -91,7 +91,6 @@ def test_debug__not_result__ok(client, mocker):
 
 
 def test_debug__service_exception__internal_error(client, mocker):
-
     request_data = {
         'code': 'some code',
         'data_in': 'some input'
@@ -107,6 +106,8 @@ def test_debug__service_exception__internal_error(client, mocker):
     )
 
     response = client.post('/debug/', json=request_data)
+
+    print(response.data)
 
     assert response.status_code == 500
     assert response.json['error'] == service_ex.message
@@ -303,7 +304,6 @@ def test_testing__not_test_error__ok(client, mocker):
 
 
 def test_testing__service_exception__internal_error(client, mocker):
-
     request_data = {
         'code': 'some code',
         'checker': 'some func',
@@ -329,6 +329,8 @@ def test_testing__service_exception__internal_error(client, mocker):
     )
 
     response = client.post('/testing/', json=request_data)
+
+    print(response.data)
 
     assert response.status_code == 500
     assert response.json['error'] == service_ex.message
