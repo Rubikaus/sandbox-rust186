@@ -6,9 +6,9 @@ ARG SANDBOX_DIR
 RUN apt-get update && \
     apt-get -y install nano curl && \
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+                                                                sh -s -- -y --profile minimal --default-toolchain 1.86.0 && \
     export PATH="$HOME/.cargo/bin:$PATH" && \
-    rustup default stable && \
-    rustup component add rust-src && \
+    rustup component add rust-src --toolchain 1.86.0 && \
     pip install --upgrade pip && \
     pip install pipenv
 
