@@ -4,10 +4,11 @@ ARG SANDBOX_USER_UID
 ARG SANDBOX_DIR
 
 RUN apt-get update && \
-    apt-get -y install nano curl && \
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
-                                                                sh -s -- -y --profile minimal --default-toolchain 1.86.0 && \
-    export PATH="$HOME/.cargo/bin:$PATH" && \
+    apt-get install -y --no-install-recommends nano curl && \
+    curl -fsSL https://sh.rustup.rs -o /tmp/rustup-init.sh && \
+    sh /tmp/rustup-init.sh -y --profile minimal --default-toolchain 1.86.0 && \
+    rm /tmp/rustup-init.sh && \
+    . "$HOME/.cargo/env" && \
     rustup component add rust-src --toolchain 1.86.0 && \
     pip install --upgrade pip && \
     pip install pipenv
