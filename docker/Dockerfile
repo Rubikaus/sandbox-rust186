@@ -4,8 +4,9 @@ ARG SANDBOX_USER_UID
 ARG SANDBOX_DIR
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends nano curl && \
-    curl -fsSL https://sh.rustup.rs -o /tmp/rustup-init.sh && \
+    apt-get -y install nano curl && \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused \
+         https://sh.rustup.rs -o /tmp/rustup-init.sh && \
     sh /tmp/rustup-init.sh -y --profile minimal --default-toolchain 1.86.0 && \
     rm /tmp/rustup-init.sh && \
     . "$HOME/.cargo/env" && \
