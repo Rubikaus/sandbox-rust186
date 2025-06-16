@@ -1,18 +1,20 @@
-FROM python:3.8.12-buster
+FROM python:3.8.12-slim-bullseye
 
 ARG SANDBOX_USER_UID
 ARG SANDBOX_DIR
 
 RUN apt-get update && \
-    apt-get -y install nano curl && \
-    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused \
-         https://sh.rustup.rs -o /tmp/rustup-init.sh && \
-    sh /tmp/rustup-init.sh -y --profile minimal --default-toolchain 1.86.0 && \
-    rm /tmp/rustup-init.sh && \
-    . "$HOME/.cargo/env" && \
-    rustup component add rust-src --toolchain 1.86.0 && \
-    pip install --upgrade pip && \
-    pip install pipenv
+    apt-get install -y --no-install-recommends nano curl ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://sh.rustup.rs -o /tmp/rustup-init.sh
+
+RUN sh /tmp/rustup-init.sh -y --profile minimal --default-toolchain none
+
+RUN . "$HOME/.cargo/env" && \
+    rustup toolchain install 1.86.0 --component rust-src --profile minimal
+
+RUN pip install --upgrade pip pipenv
 
 RUN adduser \
     --system \
