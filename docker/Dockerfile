@@ -1,4 +1,4 @@
-FROM python:3.8.12-slim-bullseye
+FROM python:3.8.12-buster
 
 ARG SANDBOX_USER_UID
 ARG SANDBOX_DIR
@@ -15,7 +15,6 @@ RUN . "$HOME/.cargo/env" && \
     rustup toolchain install 1.86.0 --component rust-src --profile minimal
 
 RUN pip install --upgrade pip pipenv
-
 
 RUN adduser \
     --system \
