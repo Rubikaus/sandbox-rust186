@@ -1,4 +1,4 @@
-FROM python:3.8.12-slim-bullseye
+FROM python:3.8.12-bullseye
 
 ARG SANDBOX_USER_UID
 ARG SANDBOX_DIR

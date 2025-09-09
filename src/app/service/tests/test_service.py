@@ -176,7 +176,7 @@ def test_execute__write_access__error():
     exec_result = RustService._execute(file=file)
 
     # assert
-    assert "Write allowed." in exec_result.result
+    assert exec_result.result == 'Write Permission denied.'
     assert exec_result.error is None
     file.remove()
 

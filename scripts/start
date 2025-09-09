@@ -1,4 +1,4 @@
 #!/bin/bash
 docker volume create import || true
 docker network create localhost || true
-docker-compose -f ../docker/docker-compose.yml start
+docker compose -f ../docker/docker-compose.yml start || docker-compose -f ../docker/docker-compose.yml start
