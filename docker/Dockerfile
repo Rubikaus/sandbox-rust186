@@ -38,7 +38,4 @@ RUN adduser \
 COPY ./src/Pipfile ./src/Pipfile.lock /tmp/
 RUN cd /tmp && pipenv install --deploy --dev --system
 
-ENV PATH="/root/.cargo/bin:${PATH}"
-ENV RUST_BACKTRACE=1
-
 WORKDIR ${SANDBOX_DIR}
