@@ -21,7 +21,7 @@ services:
       - SANDBOX_USER_UID=999
       - SANDBOX_DIR=/sandbox
       - RUST_BACKTRACE=1
-    restart: on-failure
+    restart: always
     command: gunicorn --pythonpath '/app/src' --bind 0:9009 app.main:app --reload -w 1
 
 networks:
